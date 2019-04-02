@@ -10,58 +10,59 @@ menggunakan cURL dan simple html dom.
 *********************************************************************/
 
 class Gsm
-{    
-    
+{
+
     function __construct()
     {
-		// Include library simple html dom
+        // Include library simple html dom
         require("simple_html_dom.php");
 
-		// Fix bug slug symbol
-		$this->simbol = array("&", "+");
+        // Fix bug slug symbol
+        $this->simbol = array("&", "+");
         $this->kata = array("_and_", "_plus_");
-		
+
     }
-	   
+
     ####################### NGE cURL ##########################
-	private function mycurl($url)
-	{
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_USERAGENT, "Googlebot/2.1 (http://www.googlebot.com/bot.html)");
+    private function mycurl($url)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_USERAGENT, "Googlebot/2.1 (http://www.googlebot.com/bot.html)");
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 0);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
         curl_setopt($ch, CURLOPT_URL, $url);
-		
-		// Gagal ngecURL
+
+        // Gagal ngecURL
         if(!$site = curl_exec($ch)){
-			return 'offline';
+        	return 'offline';
 		}
-		
+
 		// Sukses ngecURL
 		else{
 			return $site;
 		}
-	}   
+	}
     ####################### END cURL ##########################
 
     function search($q = "")
     {
-		
+
 		// Initial ARRAY untuk output
 		$result = array();
-		
+
 		// Run cURL
-		$url  = 'http://www.gsmarena.com/results.php3?sQuickSearch=yes&sName='.urlencode($q);
+		$url  = 'https://www.gsmarena.com/results.php3?sQuickSearch=yes&sName='.urlencode($q);
 		$ngecurl = $this->mycurl($url);
-				
+
 		// Jika situs yang di cURL lagi offline/maintenance maka akan menampilkan error message
 		if($ngecurl == 'offline'){
 			$result["status"] = "error";
 			$result["data"] = array();
 		}else{
-					
+
 			$html  = str_get_html($ngecurl);
 
 			// Manipulasi DOM menggunakan library simple html dom. Find div dengan nama class st-text
@@ -85,25 +86,25 @@ class Gsm
 			}
 		}
 
-		return $result;		
+		return $result;
     }
 
     function detail($slug = "")
     {
-		
+
 		// Initial ARRAY untuk output
 		$result = array();
-			
+
 		// Run cURL
-		$url  = 'http://www.gsmarena.com/'.str_replace($this->kata, $this->simbol, $slug).'.php';
+		$url  = 'https://www.gsmarena.com/'.str_replace($this->kata, $this->simbol, $slug).'.php';
 		$ngecurl = $this->mycurl($url);
-				
+
 		// Jika situs yang di cURL lagi offline/maintenance maka akan menampilkan error message
 		if($ngecurl == 'offline'){
 			$result["status"] = "error";
 			$result["data"] = array();
 		}else{
-					
+
 			$html  = str_get_html($ngecurl);
 			if($html->find('title', 0)->innertext == '404 Not Found'){
 				$result["status"] = "error";
@@ -111,13 +112,13 @@ class Gsm
 			}else{
 				$result["status"] = "sukses";
 				$result["title"] = $html->find('h1[class=specs-phone-name-title]', 0)->innertext;
-				
+
 				$img_div = $html->find('div[class=specs-photo-main]', 0);
 				$result["img"] = $img_div->find('img', 0)->src;
 
 				// Manipulasi DOM menggunakan library simple html dom. Find div dengan nama class specs-list
 				$div = $html->find('div[id=specs-list]', 0);
-					
+
 				foreach ($div->find('table') as $table) {
 					$th = $table->find('th', 0);
 					// Membuat array. Find tr from table
@@ -126,10 +127,10 @@ class Gsm
 						$search  = array(".", ",", "&", "-", " ");
 						$replace = array("", "", "", "_", "_");
 						$ttl = strtolower(str_replace($search, $replace, $ttl));
-						$nfo = $tr->find('td', 1);					
-						$result["data"][strtolower($th->innertext)][] = array(						
+						$nfo = $tr->find('td', 1);
+						$result["data"][strtolower($th->innertext)][] = array(
 							strip_tags($ttl) => strip_tags($nfo)
-						);					
+						);
 					}
 				}
 				$search  = array("},{", "[", "]", '","nbsp;":"', "nbsp;", " - ");
@@ -138,16 +139,16 @@ class Gsm
 				$result = json_decode($newjson);
 			}
 		}
-		return $result;		
+		return $result;
     }
-    
+
 }
 
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept');
 header('Access-Control-Allow-Methods: GET, POST, PUT');
-
+//header("Content-Type:application/json");
 if(isset($_GET['type'])) {
 
 	$init = new Gsm();
@@ -155,23 +156,25 @@ if(isset($_GET['type'])) {
 
 	switch ($_GET['type']) {
 		case 'search':
-			
-			if($method == 'POST') {
+
+			if($method == 'POST' || $method == 'GET') {
 				$input = $_POST['body'];
-				echo json_encode($init->search($input['q']));
+                if(!$input) $input = $_GET['q'];
+                else $input = $input['q'];
+              echo json_encode($init->search($input));
 			}
 
 			break;
 
 		case 'detail':
-			
+
 			if($method == 'GET') {
 				$slug = (isset($_GET['s'])) ? $_GET['s'] : '';
 				echo json_encode($init->detail($slug));
 			}
 
 			break;
-		
+
 		default:
 			echo json_encode(['status'=>false]);
 			break;
